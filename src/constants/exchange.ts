@@ -14,7 +14,7 @@ export const EXCHANGE_STATUS_OPTIONS = [
 
 export const EXCHANGE_ACTION_FLOW: Record<ExchangeStatus, ExchangeStatus[]> = {
   [ExchangeStatus.PENDING]: [ExchangeStatus.ACCEPTED, ExchangeStatus.REJECTED],
-  [ExchangeStatus.ACCEPTED]: [ExchangeStatus.COMPLETED],
+  [ExchangeStatus.ACCEPTED]: [ExchangeStatus.COMPLETED, ExchangeStatus.REJECTED],
   [ExchangeStatus.REJECTED]: [],
   [ExchangeStatus.COMPLETED]: [],
 };

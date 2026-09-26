@@ -3,7 +3,7 @@ import { orderBy } from 'lodash-es';
 
 import { itemApi } from '@/api/itemApi';
 import { ItemStatus } from '@/constants/item';
-import { FORM_MESSAGES } from '@/constants/messages';
+import { EXCHANGE_MESSAGES, FORM_MESSAGES } from '@/constants/messages';
 import type { Item, ItemDraft } from '@/models/item';
 import { message } from '@/utils/message';
 import { validateItemDraft } from '@/utils/validators';
@@ -64,6 +64,11 @@ export const useItemStore = defineStore('items', {
       return item;
     },
     async offline(itemId: string) {
+      const target = this.items.find((item) => item.id === itemId);
+      if (target?.status === ItemStatus.BOOKED) {
+        message(EXCHANGE_MESSAGES.offlineBlocked, 'error');
+        return;
+      }
       await itemApi.setStatus(itemId, ItemStatus.OFFLINE);
       this.items = await itemApi.list();
       message('物品已下架', 'success');

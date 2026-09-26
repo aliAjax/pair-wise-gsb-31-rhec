@@ -28,6 +28,19 @@
         </dl>
         <UserBrief v-if="owner" :user="owner" />
 
+        <div v-if="item.status === ItemStatus.BOOKED" class="lock-panel">
+          <p class="lock-panel__title">{{ EXCHANGE_MESSAGES.itemLockedPanel }}</p>
+          <template v-if="lockingExchange">
+            <p>
+              占用去向：{{ lockingExchangeFrom }} → {{ lockingExchangeTo }} 的交换单（{{
+                formatExchangeStatus(lockingExchange.status)
+              }}，更新于 {{ formatDate(lockingExchange.updated_at) }}）
+            </p>
+            <RouterLink class="text-link" to="/exchanges">前往交换管理处理</RouterLink>
+          </template>
+          <p v-else>占用去向：交换记录同步中，请稍后在交换管理查看。</p>
+        </div>
+
         <div v-if="!isMine" class="exchange-box">
           <label>
             我的交换物
@@ -45,10 +58,16 @@
           <button class="primary-button" type="button" :disabled="item.status !== ItemStatus.AVAILABLE" @click="requestExchange">
             发起交换
           </button>
+          <p v-if="item.status !== ItemStatus.AVAILABLE" class="exchange-box__hint">
+            {{ formatStatusMessage(item.status) }}，暂不可发起交换
+          </p>
         </div>
         <button v-else-if="item.status === ItemStatus.AVAILABLE" class="secondary-button" type="button" @click="offlineItem">
           下架这件物品
         </button>
+        <p v-else-if="item.status === ItemStatus.BOOKED" class="exchange-box__hint">
+          {{ EXCHANGE_MESSAGES.offlineBlocked }}
+        </p>
       </article>
     </div>
   </section>
@@ -64,10 +83,11 @@ import ItemImageGallery from '@/components/common/ItemImageGallery.vue';
 import UserBrief from '@/components/common/UserBrief.vue';
 import { ExchangeStatus } from '@/constants/exchange';
 import { ItemStatus } from '@/constants/item';
+import { EXCHANGE_MESSAGES } from '@/constants/messages';
 import { useAuthStore } from '@/stores/authStore';
 import { useExchangeStore } from '@/stores/exchangeStore';
 import { useItemStore } from '@/stores/itemStore';
-import { formatCondition, formatDate, formatItemStatus, statusToneClass } from '@/utils/formatters';
+import { formatCondition, formatDate, formatExchangeStatus, formatItemStatus, formatStatusMessage, statusToneClass } from '@/utils/formatters';
 import { message } from '@/utils/message';
 
 const route = useRoute();
@@ -80,6 +100,15 @@ const owner = computed(() => authStore.users.find((user) => user.id === item.val
 const isMine = computed(() => authStore.currentUser?.id === item.value?.user_id);
 const ownAvailableItems = computed(() =>
   authStore.currentUser ? itemStore.availableMyItems(authStore.currentUser.id) : [],
+);
+const lockingExchange = computed(() =>
+  item.value?.locked_by ? exchangeStore.byId(item.value.locked_by) : undefined,
+);
+const lockingExchangeFrom = computed(
+  () => authStore.users.find((user) => user.id === lockingExchange.value?.from_user_id)?.nickname ?? '未知用户',
+);
+const lockingExchangeTo = computed(
+  () => authStore.users.find((user) => user.id === lockingExchange.value?.to_user_id)?.nickname ?? '未知用户',
 );
 const selectedItemId = ref('');
 const messageText = ref('我想用这件闲置与你交换，可以沟通时间和地点。');

@@ -24,7 +24,8 @@ const seedItems: Item[] = [
     category: '书籍',
     condition: ItemCondition.LIKE_NEW,
     images: [],
-    status: ItemStatus.AVAILABLE,
+    status: ItemStatus.BOOKED,
+    locked_by: 'exchange_seed_lock',
     location: '苏州 · 工业园',
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
   },
@@ -39,6 +40,19 @@ const seedItems: Item[] = [
     status: ItemStatus.AVAILABLE,
     location: '上海 · 徐汇',
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+  },
+  {
+    id: 'item_desk',
+    user_id: 'user_lin',
+    title: '桌面置物架',
+    description: '钢木结构，承重不错，已与陈木木约定交换，等待当面交付。',
+    category: '家居',
+    condition: ItemCondition.GOOD,
+    images: [],
+    status: ItemStatus.BOOKED,
+    locked_by: 'exchange_seed_lock',
+    location: '杭州 · 西湖',
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 50).toISOString(),
   },
   {
     id: 'item_lamp',
@@ -93,5 +107,34 @@ export const itemApi = {
 
   async setStatus(id: string, status: ItemStatus): Promise<Item> {
     return this.update(id, { status });
+  },
+
+  async patchMany(ids: string[], patch: Partial<Item>): Promise<Item[]> {
+    const items = await this.list();
+    const targets = new Set(ids);
+    const nextItems = items.map((item) => (targets.has(item.id) ? { ...item, ...patch } : item));
+    await storage.set(STORAGE_KEYS.items, nextItems);
+    return nextItems.filter((item) => targets.has(item.id));
+  },
+
+  /** 同意交换时锁定双方物品，并记录占用去向（交换单 id） */
+  async lockForExchange(ids: string[], exchangeId: string): Promise<Item[]> {
+    return this.patchMany(ids, { status: ItemStatus.BOOKED, locked_by: exchangeId });
+  },
+
+  /** 拒绝/取消时释放本单占用的物品，只释放确实由本单锁定的物品 */
+  async releaseExchangeLock(ids: string[], exchangeId: string): Promise<Item[]> {
+    const items = await this.list();
+    const held = items.filter((item) => ids.includes(item.id) && item.locked_by === exchangeId);
+    if (!held.length) return [];
+    return this.patchMany(
+      held.map((item) => item.id),
+      { status: ItemStatus.AVAILABLE, locked_by: null },
+    );
+  },
+
+  /** 交换完成后物品进入已交换状态，占用随之终结 */
+  async completeExchangeItems(ids: string[]): Promise<Item[]> {
+    return this.patchMany(ids, { status: ItemStatus.EXCHANGED, locked_by: null });
   },
 };

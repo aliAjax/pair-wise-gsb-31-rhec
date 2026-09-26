@@ -17,6 +17,7 @@ ReSwap 是一个纯前端以物换物 Web 应用。用户可以本地模拟登�
 - 物品详情、物主资料、选择自己的物品发起交换。
 - 发布物品，支持本地 base64 图片上传、分类和成色选择。
 - 交换管理，区分我发起的和我收到的请求，支持同意、拒绝、完成。
+- 交换锁定：同意即锁定双方物品（`ItemStatus.BOOKED`），锁定中的物品不能再次被同意；拒绝或完成后按业务结果释放占用，列表与详情页展示占用去向。
 - 个人中心，编辑资料、上传头像、查看我发布的物品。
 - 主题切换、全局错误处理和 Vant 提示。
 
@@ -82,6 +83,8 @@ src/
 
 定义位置：`src/constants/item.ts`
 
+取值：`AVAILABLE = 'available'`（可交换）、`BOOKED = 'booked'`（锁定中）、`EXCHANGED = 'exchanged'`（已交换）、`OFFLINE = 'offline'`（已下架）。
+
 出现位置：
 
 - `src/models/item.ts`
@@ -92,6 +95,7 @@ src/
 - `src/router/guards.ts`
 - `src/utils/formatters.ts`
 - `src/components/common/ItemCard.vue`
+- `src/components/common/ExchangeCard.vue`
 - `src/pages/ItemDetail.vue`
 - `src/pages/Publish.vue`
 - `src/pages/Profile.vue`
@@ -124,7 +128,17 @@ src/
 - `ItemStatus` 与 `ExchangeStatus` 被模型、API、store、组件、页面、router guards、formatters 多处引用。
 - `utils/storage.ts` 是存储入口，但全应用 API 和 store 都依赖它的 key 与数据结构。
 
-例如新增 `ItemStatus.BOOKED` 时，应至少修改：`src/constants/item.ts`、`src/models/item.ts`、`src/api/itemApi.ts`、`src/api/exchangeApi.ts`、`src/stores/itemStore.ts`、`src/router/guards.ts`、`src/utils/formatters.ts`、`src/constants/messages.ts`、`src/components/common/ItemCard.vue`、`src/pages/ItemDetail.vue`、`src/pages/Publish.vue` 等文件。
+例如新增 `ItemStatus.BOOKED` 时，应至少修改：`src/constants/item.ts`、`src/models/item.ts`、`src/api/itemApi.ts`、`src/api/exchangeApi.ts`、`src/stores/itemStore.ts`、`src/router/guards.ts`、`src/utils/formatters.ts`、`src/constants/messages.ts`、`src/components/common/ItemCard.vue`、`src/components/common/ExchangeCard.vue`、`src/pages/ItemDetail.vue`、`src/pages/Publish.vue` 等文件。
+
+## 交换锁定机制
+
+为避免同一物品被重复同意导致“两笔已完成、一方拿不到东西”，交换流程引入物品占用：
+
+- **同意即锁定**：物主同意交换时，`exchangeApi.transition` 校验双方物品均为可交换，然后写入 `ItemStatus.BOOKED` 并在 `Item.locked_by` 记录占用去向（交换单 id）。
+- **锁定不可再同意**：任一物品处于锁定中（或已交换/已下架）时，其他待确认请求无法被同意，前端禁用按钮并提示原因，API 层同样抛出错误。
+- **按业务结果释放**：拒绝（含已同意后反悔）会释放本单占用、物品回到可交换；完成交换则把双方物品转为已交换，占用终结。
+- **占用去向展示**：交换卡片和物品详情页展示每件物品的锁定状态、持有占用的交换单及当前可执行操作。
+- **历史数据兼容**：`exchangeApi.syncItemLocks` 在启动时对齐数据——已同意的交换补齐锁定，失效的占用标记释放回可交换；已存在的待确认请求全部保留。
 
 ## 环境变量
 
