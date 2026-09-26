@@ -34,7 +34,7 @@
         :users="authStore.users"
         @accept="exchangeStore.accept"
         @reject="exchangeStore.reject"
-        @complete="completeExchange"
+        @complete="exchangeStore.complete"
       />
     </div>
     <EmptyState
@@ -72,11 +72,6 @@ const mine = computed(() => {
 });
 const visibleExchanges = computed(() => mine.value);
 const stats = useExchangeStats(() => exchangeStore.exchanges);
-
-const completeExchange = async (id: string) => {
-  await exchangeStore.complete(id);
-  itemStore.items = itemStore.items.map((item) => item);
-};
 
 void ExchangeStatus.PENDING;
 </script>

@@ -588,6 +588,31 @@ textarea {
   margin: 0;
 }
 
+.lock-hint {
+  color: #9b5c1c;
+  font-size: 0.78rem;
+}
+
+.operate-hint {
+  color: color-mix(in oklch, var(--rs-text), transparent 35%);
+  font-size: 0.85rem;
+}
+
+.lock-banner {
+  margin: 0;
+  border-radius: 7px;
+  background: color-mix(in oklch, #bb7a35, transparent 85%);
+  color: #9b5c1c;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+}
+
+.exchange-card__actions button:disabled,
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .exchange-card__actions {
   display: flex;
   flex-wrap: wrap;

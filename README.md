@@ -17,6 +17,7 @@ ReSwap 是一个纯前端以物换物 Web 应用。用户可以本地模拟登�
 - 物品详情、物主资料、选择自己的物品发起交换。
 - 发布物品，支持本地 base64 图片上传、分类和成色选择。
 - 交换管理，区分我发起的和我收到的请求，支持同意、拒绝、完成。
+- 交换锁定：同意交换即锁定双方物品（`ItemStatus.LOCKED`），锁定中的物品不能再次被同意或发起新交换；拒绝/取消释放占用，完成后结算为已交换；列表与详情页展示占用去向和可操作状态。
 - 个人中心，编辑资料、上传头像、查看我发布的物品。
 - 主题切换、全局错误处理和 Vant 提示。
 
@@ -82,6 +83,8 @@ src/
 
 定义位置：`src/constants/item.ts`
 
+取值：`AVAILABLE = 'available'`（可交换）、`LOCKED = 'locked'`（锁定中）、`EXCHANGED = 'exchanged'`（已交换）、`OFFLINE = 'offline'`（已下架）。
+
 出现位置：
 
 - `src/models/item.ts`
@@ -92,6 +95,7 @@ src/
 - `src/router/guards.ts`
 - `src/utils/formatters.ts`
 - `src/components/common/ItemCard.vue`
+- `src/components/common/ExchangeCard.vue`
 - `src/pages/ItemDetail.vue`
 - `src/pages/Publish.vue`
 - `src/pages/Profile.vue`
@@ -124,7 +128,16 @@ src/
 - `ItemStatus` 与 `ExchangeStatus` 被模型、API、store、组件、页面、router guards、formatters 多处引用。
 - `utils/storage.ts` 是存储入口，但全应用 API 和 store 都依赖它的 key 与数据结构。
 
-例如新增 `ItemStatus.BOOKED` 时，应至少修改：`src/constants/item.ts`、`src/models/item.ts`、`src/api/itemApi.ts`、`src/api/exchangeApi.ts`、`src/stores/itemStore.ts`、`src/router/guards.ts`、`src/utils/formatters.ts`、`src/constants/messages.ts`、`src/components/common/ItemCard.vue`、`src/pages/ItemDetail.vue`、`src/pages/Publish.vue` 等文件。
+例如新增 `ItemStatus.LOCKED`（锁定中）时，实际修改了：`src/constants/item.ts`、`src/models/item.ts`、`src/api/itemApi.ts`、`src/api/exchangeApi.ts`、`src/stores/exchangeStore.ts`、`src/router/guards.ts`、`src/utils/formatters.ts`、`src/constants/messages.ts`、`src/components/common/ExchangeCard.vue`、`src/pages/ItemDetail.vue`、`src/styles.css` 等文件。
+
+## 交换锁定机制
+
+- 物主同意交换（`PENDING → ACCEPTED`）时，`exchangeApi.transition` 调用 `itemApi.lockForExchange` 把双方物品置为 `LOCKED`，并在物品的 `locked_by_exchange_id` 上记录占用去向；任一物品已被其他交换占用时整单拒绝，提示"物品已被其他进行中的交换锁定"。
+- 锁定中的物品不能再次被同意，也不能被选中发起新交换（`exchangeApi.create` 同时校验双方物品状态）。
+- 拒绝/取消（`→ REJECTED`，含已同意后的取消）调用 `itemApi.releaseForExchange`，仅释放本交换持有的占用，物品回到可交换。
+- 完成（`ACCEPTED → COMPLETED`）调用 `itemApi.completeForExchange`，占用按业务结果结算为已交换。
+- 已被锁定影响的待确认请求不会被删除，仍保留在交换列表中，物主可拒绝或等占用释放后再处理。
+- 交换列表（`ExchangeCard`）逐物品显示"本交换锁定中 / 被与「xx」的交换占用"，并在物品不可操作时禁用"同意"按钮；物品详情页展示锁定横幅与占用去向。
 
 ## 环境变量
 

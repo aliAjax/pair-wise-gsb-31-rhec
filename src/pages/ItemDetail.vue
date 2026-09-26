@@ -28,6 +28,10 @@
         </dl>
         <UserBrief v-if="owner" :user="owner" />
 
+        <p v-if="lockDestination" class="lock-banner">
+          {{ lockDestination }}，暂不可发起新的交换
+        </p>
+
         <div v-if="!isMine" class="exchange-box">
           <label>
             我的交换物
@@ -43,7 +47,7 @@
             <textarea v-model="messageText" rows="3" />
           </label>
           <button class="primary-button" type="button" :disabled="item.status !== ItemStatus.AVAILABLE" @click="requestExchange">
-            发起交换
+            {{ exchangeButtonText }}
           </button>
         </div>
         <button v-else-if="item.status === ItemStatus.AVAILABLE" class="secondary-button" type="button" @click="offlineItem">
@@ -67,7 +71,7 @@ import { ItemStatus } from '@/constants/item';
 import { useAuthStore } from '@/stores/authStore';
 import { useExchangeStore } from '@/stores/exchangeStore';
 import { useItemStore } from '@/stores/itemStore';
-import { formatCondition, formatDate, formatItemStatus, statusToneClass } from '@/utils/formatters';
+import { formatCondition, formatDate, formatItemStatus, formatLockDestination, statusToneClass } from '@/utils/formatters';
 import { message } from '@/utils/message';
 
 const route = useRoute();
@@ -81,6 +85,14 @@ const isMine = computed(() => authStore.currentUser?.id === item.value?.user_id)
 const ownAvailableItems = computed(() =>
   authStore.currentUser ? itemStore.availableMyItems(authStore.currentUser.id) : [],
 );
+const lockDestination = computed(() =>
+  item.value ? formatLockDestination(item.value, exchangeStore.exchanges, itemStore.items) : '',
+);
+const exchangeButtonText = computed(() => {
+  if (item.value?.status === ItemStatus.LOCKED) return '已被锁定，暂不可交换';
+  if (item.value?.status !== ItemStatus.AVAILABLE) return formatItemStatus(item.value?.status ?? ItemStatus.OFFLINE);
+  return '发起交换';
+});
 const selectedItemId = ref('');
 const messageText = ref('我想用这件闲置与你交换，可以沟通时间和地点。');
 
@@ -91,7 +103,7 @@ const requestExchange = async () => {
     message('请选择一件自己的物品', 'error');
     return;
   }
-  await exchangeStore.create({
+  const created = await exchangeStore.create({
     from_user_id: authStore.currentUser.id,
     to_user_id: owner.value.id,
     from_item_id: selectedItemId.value,
@@ -99,6 +111,9 @@ const requestExchange = async () => {
     status: ExchangeStatus.PENDING,
     message: messageText.value,
   });
+  if (created) {
+    selectedItemId.value = '';
+  }
 };
 
 const offlineItem = async () => {

@@ -1,4 +1,5 @@
 import { ItemCondition, ItemStatus } from '@/constants/item';
+import { EXCHANGE_MESSAGES } from '@/constants/messages';
 import type { Item, ItemDraft } from '@/models/item';
 
 import { storage, STORAGE_KEYS } from '@/utils/storage';
@@ -93,5 +94,45 @@ export const itemApi = {
 
   async setStatus(id: string, status: ItemStatus): Promise<Item> {
     return this.update(id, { status });
+  },
+
+  async lockForExchange(itemIds: string[], exchangeId: string): Promise<Item[]> {
+    const items = await this.list();
+    const targets = items.filter((item) => itemIds.includes(item.id));
+    const blocked = targets.find((item) => item.status !== ItemStatus.AVAILABLE);
+    if (targets.length !== itemIds.length || blocked) {
+      throw new Error(EXCHANGE_MESSAGES.lockedConflict);
+    }
+    const lockedIds = new Set(itemIds);
+    const nextItems = items.map((item) =>
+      lockedIds.has(item.id)
+        ? { ...item, status: ItemStatus.LOCKED, locked_by_exchange_id: exchangeId }
+        : item,
+    );
+    await storage.set(STORAGE_KEYS.items, nextItems);
+    return nextItems.filter((item) => lockedIds.has(item.id));
+  },
+
+  async releaseForExchange(itemIds: string[], exchangeId: string): Promise<Item[]> {
+    const items = await this.list();
+    const nextItems = items.map((item) =>
+      itemIds.includes(item.id) && item.status === ItemStatus.LOCKED && item.locked_by_exchange_id === exchangeId
+        ? { ...item, status: ItemStatus.AVAILABLE, locked_by_exchange_id: null }
+        : item,
+    );
+    await storage.set(STORAGE_KEYS.items, nextItems);
+    return nextItems.filter((item) => itemIds.includes(item.id));
+  },
+
+  async completeForExchange(itemIds: string[]): Promise<Item[]> {
+    const items = await this.list();
+    const settledIds = new Set(itemIds);
+    const nextItems = items.map((item) =>
+      settledIds.has(item.id)
+        ? { ...item, status: ItemStatus.EXCHANGED, locked_by_exchange_id: null }
+        : item,
+    );
+    await storage.set(STORAGE_KEYS.items, nextItems);
+    return nextItems.filter((item) => settledIds.has(item.id));
   },
 };

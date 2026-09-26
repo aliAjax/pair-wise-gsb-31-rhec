@@ -9,6 +9,7 @@ export interface Item {
   condition: ItemCondition;
   images: string[];
   status: ItemStatus;
+  locked_by_exchange_id?: string | null;
   location: string;
   created_at: string;
 }
